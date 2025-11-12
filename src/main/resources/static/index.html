@@ -317,194 +317,190 @@
     </style>
 </head>
 <body>
-    <div class="container">
-        <header>
-            <h1>Task Manager</h1>
-            <p class="subtitle">Organize suas tarefas de forma simples e elegante</p>
-        </header>
+<div class="container">
+    <header>
+        <h1>Task Manager</h1>
+        <p class="subtitle">Organize suas tarefas de forma simples e elegante</p>
+    </header>
 
-        <div class="form-container">
-            <div class="input-group">
-                <input type="text" id="titulo" placeholder="Nova tarefa">
-            </div>
-            <div class="input-group">
-                <textarea id="descricao" placeholder="Adicione uma descrição (opcional)"></textarea>
-            </div>
-            <button class="btn" onclick="adicionarTarefa()">Adicionar</button>
+    <div class="form-container">
+        <div class="input-group">
+            <input type="text" id="titulo" placeholder="Nova tarefa">
         </div>
-
-        <div class="stats">
-            <div class="stat-card">
-                <div class="stat-number" id="total-tarefas">0</div>
-                <div class="stat-label">Total</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-number" id="pendentes">0</div>
-                <div class="stat-label">Pendentes</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-number" id="concluidas">0</div>
-                <div class="stat-label">Concluídas</div>
-            </div>
+        <div class="input-group">
+            <textarea id="descricao" placeholder="Adicione uma descrição (opcional)"></textarea>
         </div>
-
-        <div class="filters">
-            <button class="filter-btn active" onclick="filtrarTarefas('todas')">Todas</button>
-            <button class="filter-btn" onclick="filtrarTarefas('pendentes')">Pendentes</button>
-            <button class="filter-btn" onclick="filtrarTarefas('concluidas')">Concluídas</button>
-        </div>
-
-        <ul class="task-list" id="task-list">
-            <div class="empty-state">
-                <div class="empty-icon">📝</div>
-                <p class="empty-text">Nenhuma tarefa criada ainda</p>
-            </div>
-        </ul>
+        <button class="btn" onclick="adicionarTarefa()">Adicionar</button>
     </div>
 
-    <script>
-      // Detecta automaticamente se está rodando local ou em produção
-      const API_URL = window.location.hostname === 'localhost'
-          ? 'http://localhost:8080/api/tarefas'
-          : `${window.location.origin}/api/tarefas`;
+    <div class="stats">
+        <div class="stat-card">
+            <div class="stat-number" id="total-tarefas">0</div>
+            <div class="stat-label">Total</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-number" id="pendentes">0</div>
+            <div class="stat-label">Pendentes</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-number" id="concluidas">0</div>
+            <div class="stat-label">Concluídas</div>
+        </div>
+    </div>
 
-      window.onload = function() {
-          carregarTarefas();
-      };
+    <div class="filters">
+        <button class="filter-btn active" onclick="filtrarTarefas('todas')">Todas</button>
+        <button class="filter-btn" onclick="filtrarTarefas('pendentes')">Pendentes</button>
+        <button class="filter-btn" onclick="filtrarTarefas('concluidas')">Concluídas</button>
+    </div>
 
-      async function adicionarTarefa() {
-          const titulo = document.getElementById('titulo').value.trim();
-          const descricao = document.getElementById('descricao').value.trim();
+    <ul class="task-list" id="task-list">
+        <div class="empty-state">
+            <div class="empty-icon">📝</div>
+            <p class="empty-text">Nenhuma tarefa criada ainda</p>
+        </div>
+    </ul>
+</div>
 
-          if (!titulo) {
-              return;
-          }
+<script>
+    const API_URL = window.location.hostname === 'localhost'
+        ? 'http://localhost:8080/api/tarefas'
+        : window.location.origin + '/api/tarefas';
 
-          const tarefa = {
-              titulo: titulo,
-              descricao: descricao,
-              concluida: false
-          };
+    let filtroAtual = 'todas';
 
-              try {
-                  const response = await fetch(API_URL, {
-                      method: 'POST',
-                      headers: {
-                          'Content-Type': 'application/json'
-                      },
-                      body: JSON.stringify(tarefa)
-                  });
+    window.onload = function() {
+        carregarTarefas();
+    };
 
-                  if (response.ok) {
-                      document.getElementById('titulo').value = '';
-                      document.getElementById('descricao').value = '';
-                      carregarTarefas();
-                  }
-              } catch (error) {
-                  console.error('Erro:', error);
-              }
-          }
+    async function adicionarTarefa() {
+        const titulo = document.getElementById('titulo').value.trim();
+        const descricao = document.getElementById('descricao').value.trim();
 
-          async function carregarTarefas() {
-              try {
-                  const response = await fetch(API_URL);
-                  const tarefas = await response.json();
-                  renderizarTarefas(tarefas);
-                  atualizarEstatisticas(tarefas);
-              } catch (error) {
-                  console.error('Erro:', error);
-              }
-          }
+        if (!titulo) {
+            return;
+        }
 
-          function renderizarTarefas(tarefas) {
-              const taskList = document.getElementById('task-list');
+        const tarefa = {
+            titulo: titulo,
+            descricao: descricao,
+            concluida: false
+        };
 
-              let tarefasFiltradas = tarefas;
-              if (filtroAtual === 'pendentes') {
-                  tarefasFiltradas = tarefas.filter(t => !t.concluida);
-              } else if (filtroAtual === 'concluidas') {
-                  tarefasFiltradas = tarefas.filter(t => t.concluida);
-              }
+        try {
+            const response = await fetch(API_URL, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(tarefa)
+            });
 
-              if (tarefasFiltradas.length === 0) {
-                  taskList.innerHTML = `
-                      <div class="empty-state">
-                          <div class="empty-icon">📝</div>
-                          <p class="empty-text">Nenhuma tarefa ${filtroAtual === 'todas' ? 'criada ainda' : filtroAtual}</p>
-                      </div>
-                  `;
-                  return;
-              }
+            if (response.ok) {
+                document.getElementById('titulo').value = '';
+                document.getElementById('descricao').value = '';
+                carregarTarefas();
+            }
+        } catch (error) {
+            console.error('Erro:', error);
+        }
+    }
 
-              taskList.innerHTML = tarefasFiltradas.map(tarefa => `
-                  <li class="task-item ${tarefa.concluida ? 'completed' : ''}">
-                      <div class="task-header">
-                          <div class="checkbox" onclick="alternarConclusao(${tarefa.id})"></div>
-                          <div class="task-content">
-                              <div class="task-title">${tarefa.titulo}</div>
-                              ${tarefa.descricao ? `<div class="task-description">${tarefa.descricao}</div>` : ''}
-                              <div class="task-footer">
-                                  <div class="task-date">${new Date(tarefa.dataCriacao).toLocaleDateString('pt-BR')}</div>
-                                  <button class="btn-delete" onclick="deletarTarefa(${tarefa.id}, event)">Deletar</button>
-                              </div>
-                          </div>
-                      </div>
-                  </li>
-              `).join('');
-          }
+    async function carregarTarefas() {
+        try {
+            const response = await fetch(API_URL);
+            const tarefas = await response.json();
+            renderizarTarefas(tarefas);
+            atualizarEstatisticas(tarefas);
+        } catch (error) {
+            console.error('Erro:', error);
+        }
+    }
 
-          function atualizarEstatisticas(tarefas) {
-              const total = tarefas.length;
-              const concluidas = tarefas.filter(t => t.concluida).length;
-              const pendentes = total - concluidas;
+    function renderizarTarefas(tarefas) {
+        const taskList = document.getElementById('task-list');
 
-              document.getElementById('total-tarefas').textContent = total;
-              document.getElementById('pendentes').textContent = pendentes;
-              document.getElementById('concluidas').textContent = concluidas;
-          }
+        let tarefasFiltradas = tarefas;
+        if (filtroAtual === 'pendentes') {
+            tarefasFiltradas = tarefas.filter(t => !t.concluida);
+        } else if (filtroAtual === 'concluidas') {
+            tarefasFiltradas = tarefas.filter(t => t.concluida);
+        }
 
-          async function alternarConclusao(id) {
-              try {
-                  const response = await fetch(`${API_URL}/${id}/concluir`, {
-                      method: 'PATCH'
-                  });
-                  if (response.ok) {
-                      carregarTarefas();
-                  }
-              } catch (error) {
-                  console.error('Erro:', error);
-              }
-          }
+        if (tarefasFiltradas.length === 0) {
+            taskList.innerHTML = '<div class="empty-state"><div class="empty-icon">📝</div><p class="empty-text">Nenhuma tarefa encontrada</p></div>';
+            return;
+        }
 
-          async function deletarTarefa(id, event) {
-              event.stopPropagation();
+        taskList.innerHTML = tarefasFiltradas.map(tarefa => `
+            <li class="task-item ${tarefa.concluida ? 'completed' : ''}">
+                <div class="task-header">
+                    <div class="checkbox" onclick="alternarConclusao(${tarefa.id})"></div>
+                    <div class="task-content">
+                        <div class="task-title">${tarefa.titulo}</div>
+                        ${tarefa.descricao ? '<div class="task-description">' + tarefa.descricao + '</div>' : ''}
+                        <div class="task-footer">
+                            <div class="task-date">${new Date(tarefa.dataCriacao).toLocaleDateString('pt-BR')}</div>
+                            <button class="btn-delete" onclick="deletarTarefa(${tarefa.id}, event)">Deletar</button>
+                        </div>
+                    </div>
+                </div>
+            </li>
+        `).join('');
+    }
 
-              try {
-                  const response = await fetch(`${API_URL}/${id}`, {
-                      method: 'DELETE'
-                  });
-                  if (response.ok) {
-                      carregarTarefas();
-                  }
-              } catch (error) {
-                  console.error('Erro:', error);
-              }
-          }
+    function atualizarEstatisticas(tarefas) {
+        const total = tarefas.length;
+        const concluidas = tarefas.filter(t => t.concluida).length;
+        const pendentes = total - concluidas;
 
-          function filtrarTarefas(filtro) {
-              filtroAtual = filtro;
-              document.querySelectorAll('.filter-btn').forEach(btn => {
-                  btn.classList.remove('active');
-              });
-              event.target.classList.add('active');
-              carregarTarefas();
-          }
+        document.getElementById('total-tarefas').textContent = total;
+        document.getElementById('pendentes').textContent = pendentes;
+        document.getElementById('concluidas').textContent = concluidas;
+    }
 
-          document.getElementById('titulo').addEventListener('keypress', function(e) {
-              if (e.key === 'Enter') {
-                  adicionarTarefa();
-              }
-          });
-    </script>
+    async function alternarConclusao(id) {
+        try {
+            const response = await fetch(API_URL + '/' + id + '/concluir', {
+                method: 'PATCH'
+            });
+            if (response.ok) {
+                carregarTarefas();
+            }
+        } catch (error) {
+            console.error('Erro:', error);
+        }
+    }
+
+    async function deletarTarefa(id, event) {
+        event.stopPropagation();
+
+        try {
+            const response = await fetch(API_URL + '/' + id, {
+                method: 'DELETE'
+            });
+            if (response.ok) {
+                carregarTarefas();
+            }
+        } catch (error) {
+            console.error('Erro:', error);
+        }
+    }
+
+    function filtrarTarefas(filtro) {
+        filtroAtual = filtro;
+        document.querySelectorAll('.filter-btn').forEach(btn => {
+            btn.classList.remove('active');
+        });
+        event.target.classList.add('active');
+        carregarTarefas();
+    }
+
+    document.getElementById('titulo').addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+            adicionarTarefa();
+        }
+    });
+</script>
 </body>
 </html>
