@@ -280,6 +280,7 @@
         .empty-state {
             text-align: center;
             padding: 60px 20px;
+            list-style: none;
         }
 
         .empty-icon {
@@ -349,41 +350,69 @@
     </div>
 
     <div class="filters">
-        <button class="filter-btn active" onclick="filtrarTarefas('todas')">Todas</button>
-        <button class="filter-btn" onclick="filtrarTarefas('pendentes')">Pendentes</button>
-        <button class="filter-btn" onclick="filtrarTarefas('concluidas')">Concluídas</button>
+        <button class="filter-btn active" onclick="filtrarTarefas('todas', this)">Todas</button>
+        <button class="filter-btn" onclick="filtrarTarefas('pendentes', this)">Pendentes</button>
+        <button class="filter-btn" onclick="filtrarTarefas('concluidas', this)">Concluídas</button>
     </div>
 
     <ul class="task-list" id="task-list">
-        <div class="empty-state">
+        <li class="empty-state">
             <div class="empty-icon">📝</div>
             <p class="empty-text">Nenhuma tarefa criada ainda</p>
-        </div>
+        </li>
     </ul>
 </div>
 
 <script>
-    const API_URL = window.location.hostname === 'localhost'
-        ? 'http://localhost:8080/api/tarefas'
-        : window.location.origin + '/api/tarefas';
+    // Detecção automática da URL da API
+    const API_URL = (() => {
+        const hostname = window.location.hostname;
+        const protocol = window.location.protocol;
+        const port = window.location.port;
+        
+        // Se for localhost ou 127.0.0.1, usa porta 8080
+        if (hostname === 'localhost' || hostname === '127.0.0.1') {
+            return `${protocol}//${hostname}:${port || '8080'}/api/tarefas`;
+        }
+        
+        // Em produção, usa a mesma origem
+        return `${window.location.origin}/api/tarefas`;
+    })();
 
     let filtroAtual = 'todas';
+
+    // Função para escapar HTML e prevenir XSS
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
 
     window.onload = function() {
         carregarTarefas();
     };
 
     async function adicionarTarefa() {
-        const titulo = document.getElementById('titulo').value.trim();
-        const descricao = document.getElementById('descricao').value.trim();
+        const tituloInput = document.getElementById('titulo');
+        const descricaoInput = document.getElementById('descricao');
+        
+        if (!tituloInput || !descricaoInput) {
+            console.error('Elementos do formulário não encontrados');
+            return;
+        }
+
+        const titulo = tituloInput.value.trim();
+        const descricao = descricaoInput.value.trim();
 
         if (!titulo) {
+            alert('Por favor, insira um título para a tarefa.');
+            tituloInput.focus();
             return;
         }
 
         const tarefa = {
             titulo: titulo,
-            descricao: descricao,
+            descricao: descricao || null,
             concluida: false
         };
 
@@ -397,28 +426,71 @@
             });
 
             if (response.ok) {
-                document.getElementById('titulo').value = '';
-                document.getElementById('descricao').value = '';
+                tituloInput.value = '';
+                descricaoInput.value = '';
                 carregarTarefas();
+            } else {
+                // Tenta obter mensagem de erro do servidor
+                let errorMessage = 'Erro ao criar tarefa.';
+                try {
+                    const contentType = response.headers.get('content-type');
+                    if (contentType && contentType.includes('application/json')) {
+                        const errorData = await response.json();
+                        errorMessage = errorData.message || errorData.error || errorMessage;
+                    } else {
+                        errorMessage = `Erro HTTP ${response.status}: ${response.statusText}`;
+                    }
+                } catch (e) {
+                    errorMessage = `Erro HTTP ${response.status}`;
+                }
+                console.error('Erro ao criar tarefa:', response.status, errorMessage);
+                alert(errorMessage);
             }
         } catch (error) {
-            console.error('Erro:', error);
+            console.error('Erro ao adicionar tarefa:', error);
+            alert('Erro de conexão. Verifique se o servidor está rodando.');
         }
     }
 
     async function carregarTarefas() {
         try {
             const response = await fetch(API_URL);
+            if (!response.ok) {
+                throw new Error(`Erro HTTP: ${response.status}`);
+            }
+            
+            // Verifica se a resposta é JSON
+            const contentType = response.headers.get('content-type');
+            if (!contentType || !contentType.includes('application/json')) {
+                throw new Error('Resposta não é JSON');
+            }
+            
             const tarefas = await response.json();
+            
+            // Garante que tarefas é um array
+            if (!Array.isArray(tarefas)) {
+                console.warn('Resposta não é um array:', tarefas);
+                renderizarTarefas([]);
+                atualizarEstatisticas([]);
+                return;
+            }
+            
             renderizarTarefas(tarefas);
             atualizarEstatisticas(tarefas);
         } catch (error) {
-            console.error('Erro:', error);
+            console.error('Erro ao carregar tarefas:', error);
+            const taskList = document.getElementById('task-list');
+            if (taskList) {
+                taskList.innerHTML = '<li class="empty-state"><div class="empty-icon">⚠️</div><p class="empty-text">Erro ao carregar tarefas. Verifique se o servidor está rodando.</p></li>';
+            }
+            // Atualiza estatísticas com valores zerados em caso de erro
+            atualizarEstatisticas([]);
         }
     }
 
     function renderizarTarefas(tarefas) {
         const taskList = document.getElementById('task-list');
+        if (!taskList) return;
 
         let tarefasFiltradas = tarefas;
         if (filtroAtual === 'pendentes') {
@@ -428,7 +500,7 @@
         }
 
         if (tarefasFiltradas.length === 0) {
-            taskList.innerHTML = '<div class="empty-state"><div class="empty-icon">📝</div><p class="empty-text">Nenhuma tarefa encontrada</p></div>';
+            taskList.innerHTML = '<li class="empty-state"><div class="empty-icon">📝</div><p class="empty-text">Nenhuma tarefa encontrada</p></li>';
             return;
         }
 
@@ -437,10 +509,10 @@
                 <div class="task-header">
                     <div class="checkbox" onclick="alternarConclusao(${tarefa.id})"></div>
                     <div class="task-content">
-                        <div class="task-title">${tarefa.titulo}</div>
-                        ${tarefa.descricao ? '<div class="task-description">' + tarefa.descricao + '</div>' : ''}
+                        <div class="task-title">${escapeHtml(tarefa.titulo || '')}</div>
+                        ${tarefa.descricao ? '<div class="task-description">' + escapeHtml(tarefa.descricao) + '</div>' : ''}
                         <div class="task-footer">
-                            <div class="task-date">${new Date(tarefa.dataCriacao).toLocaleDateString('pt-BR')}</div>
+                            <div class="task-date">${tarefa.dataCriacao ? new Date(tarefa.dataCriacao).toLocaleDateString('pt-BR') : 'Data não disponível'}</div>
                             <button class="btn-delete" onclick="deletarTarefa(${tarefa.id}, event)">Deletar</button>
                         </div>
                     </div>
@@ -460,39 +532,90 @@
     }
 
     async function alternarConclusao(id) {
+        if (!id) {
+            console.error('ID da tarefa não fornecido');
+            return;
+        }
+
         try {
-            const response = await fetch(API_URL + '/' + id + '/concluir', {
-                method: 'PATCH'
+            const response = await fetch(`${API_URL}/${id}/concluir`, {
+                method: 'PATCH',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
             });
+            
             if (response.ok) {
                 carregarTarefas();
+            } else {
+                const contentType = response.headers.get('content-type');
+                let errorMessage = `Erro HTTP ${response.status}`;
+                if (contentType && contentType.includes('application/json')) {
+                    try {
+                        const errorData = await response.json();
+                        errorMessage = errorData.message || errorData.error || errorMessage;
+                    } catch (e) {
+                        // Ignora erro de parsing
+                    }
+                }
+                console.error('Erro ao alternar conclusão:', response.status, errorMessage);
             }
         } catch (error) {
-            console.error('Erro:', error);
+            console.error('Erro ao alternar conclusão:', error);
         }
     }
 
     async function deletarTarefa(id, event) {
-        event.stopPropagation();
+        if (event) {
+            event.stopPropagation();
+        }
+
+        if (!id) {
+            console.error('ID da tarefa não fornecido');
+            return;
+        }
+
+        if (!confirm('Tem certeza que deseja deletar esta tarefa?')) {
+            return;
+        }
 
         try {
-            const response = await fetch(API_URL + '/' + id, {
+            const response = await fetch(`${API_URL}/${id}`, {
                 method: 'DELETE'
             });
+            
             if (response.ok) {
                 carregarTarefas();
+            } else {
+                const contentType = response.headers.get('content-type');
+                let errorMessage = 'Erro ao deletar tarefa.';
+                if (contentType && contentType.includes('application/json')) {
+                    try {
+                        const errorData = await response.json();
+                        errorMessage = errorData.message || errorData.error || errorMessage;
+                    } catch (e) {
+                        errorMessage = `Erro HTTP ${response.status}`;
+                    }
+                } else {
+                    errorMessage = `Erro HTTP ${response.status}: ${response.statusText}`;
+                }
+                console.error('Erro ao deletar tarefa:', response.status, errorMessage);
+                alert(errorMessage);
             }
         } catch (error) {
-            console.error('Erro:', error);
+            console.error('Erro ao deletar tarefa:', error);
+            alert('Erro de conexão ao deletar tarefa.');
         }
     }
 
-    function filtrarTarefas(filtro) {
+    function filtrarTarefas(filtro, eventElement) {
         filtroAtual = filtro;
         document.querySelectorAll('.filter-btn').forEach(btn => {
             btn.classList.remove('active');
         });
-        event.target.classList.add('active');
+        if (eventElement) {
+            eventElement.classList.add('active');
+        }
         carregarTarefas();
     }
 

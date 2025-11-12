@@ -1,5 +1,6 @@
 package com.todolist;
 
+import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -19,9 +20,22 @@ public class TarefaController {
     // CREATE - Criar nova tarefa
     // POST http://localhost:8080/api/tarefas
     @PostMapping
-    public ResponseEntity<Tarefa> criar(@RequestBody Tarefa tarefa) {
-        Tarefa novaTarefa = repository.save(tarefa);
-        return ResponseEntity.status(HttpStatus.CREATED).body(novaTarefa);
+    public ResponseEntity<?> criar(@Valid @RequestBody Tarefa tarefa) {
+        try {
+            // Garante que a data de criação seja definida
+            if (tarefa.getDataCriacao() == null) {
+                tarefa.setDataCriacao(java.time.LocalDateTime.now());
+            }
+            // Garante que concluida seja false por padrão
+            if (tarefa.getConcluida() == null) {
+                tarefa.setConcluida(false);
+            }
+            Tarefa novaTarefa = repository.save(tarefa);
+            return ResponseEntity.status(HttpStatus.CREATED).body(novaTarefa);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Erro ao criar tarefa: " + e.getMessage());
+        }
     }
 
     // READ - Listar todas as tarefas
@@ -45,26 +59,37 @@ public class TarefaController {
     // GET http://localhost:8080/api/tarefas/status/true
     @GetMapping("/status/{concluida}")
     public ResponseEntity<List<Tarefa>> listarPorStatus(@PathVariable Boolean concluida) {
-        List<Tarefa> tarefas = repository.findByConcluida(concluida);
-        return ResponseEntity.ok(tarefas);
+        try {
+            List<Tarefa> tarefas = repository.findByConcluida(concluida);
+            return ResponseEntity.ok(tarefas);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
     }
 
     // UPDATE - Atualizar tarefa
     // PUT http://localhost:8080/api/tarefas/1
     @PutMapping("/{id}")
-    public ResponseEntity<Tarefa> atualizar(@PathVariable Long id, @RequestBody Tarefa tarefaAtualizada) {
-        Optional<Tarefa> tarefaExistente = repository.findById(id);
+    public ResponseEntity<?> atualizar(@PathVariable Long id, @Valid @RequestBody Tarefa tarefaAtualizada) {
+        try {
+            Optional<Tarefa> tarefaExistente = repository.findById(id);
 
-        if (tarefaExistente.isPresent()) {
-            Tarefa tarefa = tarefaExistente.get();
-            tarefa.setTitulo(tarefaAtualizada.getTitulo());
-            tarefa.setDescricao(tarefaAtualizada.getDescricao());
-            tarefa.setConcluida(tarefaAtualizada.getConcluida());
+            if (tarefaExistente.isPresent()) {
+                Tarefa tarefa = tarefaExistente.get();
+                tarefa.setTitulo(tarefaAtualizada.getTitulo());
+                tarefa.setDescricao(tarefaAtualizada.getDescricao());
+                if (tarefaAtualizada.getConcluida() != null) {
+                    tarefa.setConcluida(tarefaAtualizada.getConcluida());
+                }
 
-            Tarefa tarefaSalva = repository.save(tarefa);
-            return ResponseEntity.ok(tarefaSalva);
-        } else {
-            return ResponseEntity.notFound().build();
+                Tarefa tarefaSalva = repository.save(tarefa);
+                return ResponseEntity.ok(tarefaSalva);
+            } else {
+                return ResponseEntity.notFound().build();
+            }
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Erro ao atualizar tarefa: " + e.getMessage());
         }
     }
 
@@ -105,72 +130,4 @@ public class TarefaController {
         return ResponseEntity.noContent().build();
     }
 }
-
-/* @RestController  // ← Esta classe é uma API REST
-
-@RequestMapping("/api/tarefas")  // ← Todas as rotas começam com /api/tarefas
-
-@Autowired  // ← Spring injeta o repository automaticamente
-```
-
-### **CRUD completo:**
-
-| Método HTTP | URL | O que faz |
-|------------|-----|-----------|
-| **POST** | `/api/tarefas` | ✅ Criar tarefa |
-| **GET** | `/api/tarefas` | 📋 Listar todas |
-| **GET** | `/api/tarefas/1` | 🔍 Buscar por ID |
-| **GET** | `/api/tarefas/status/false` | 📋 Listar pendentes |
-| **PUT** | `/api/tarefas/1` | ✏️ Atualizar tarefa |
-| **PATCH** | `/api/tarefas/1/concluir` | ☑️ Marcar concluída |
-| **DELETE** | `/api/tarefas/1` | 🗑️ Deletar tarefa |
-| **DELETE** | `/api/tarefas` | 🗑️ Deletar todas |
-
----
-
-## ✅ **Salve o arquivo:**
-
-`Ctrl + S` ou `Cmd + S`
-
----
-
-## 🔄 **IMPORTANTE: Reiniciar a aplicação**
-
-Como você criou novos arquivos, precisa **reiniciar** o Spring Boot:
-
-1. **No console do IntelliJ** (parte de baixo), procura o botão **🛑 Stop**
-
-2. **Clica nele** para parar a aplicação
-
-3. **Roda novamente:** Clica no **▶️ Run** ou aperta `Shift + F10`
-
----
-
-## 🎉 **Aguarde iniciar e...**
-
-Quando aparecer no console:
-```
-Started TodolistApplication in X seconds
-```
-
-**Sua API está PRONTA!** 🚀
-
----
-
-## 🧪 **Vamos testar agora!**
-
-Vou te ensinar a testar cada endpoint.
-
----
-
-## 📝 **Me avisa:**
-```
-[ ] Criei TarefaController
-[ ] Colei o código
-[ ] Salvei
-[ ] Reiniciei a aplicação
-[ ] Aplicação rodando novamente
-[ ] Pronta para testar!
-[ ] Deu erro: _______________
-*/
 

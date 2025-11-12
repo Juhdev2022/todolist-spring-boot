@@ -1,6 +1,8 @@
 package com.todolist;
 
 import jakarta.persistence.*;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 import java.time.LocalDateTime;
 
 @Entity
@@ -12,9 +14,12 @@ public class Tarefa {
     private Long id;
 
     @Column(nullable = false)
+    @NotBlank(message = "O título é obrigatório")
+    @Size(max = 200, message = "O título deve ter no máximo 200 caracteres")
     private String titulo;
 
     @Column(length = 500)
+    @Size(max = 500, message = "A descrição deve ter no máximo 500 caracteres")
     private String descricao;
 
     @Column(nullable = false)
