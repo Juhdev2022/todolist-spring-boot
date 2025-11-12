@@ -87,6 +87,42 @@
             min-height: 80px;
         }
 
+        .time-inputs {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+
+        .time-input-wrapper {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .time-label {
+            font-size: 12px;
+            color: #71717a;
+            margin-bottom: 6px;
+            font-weight: 500;
+        }
+
+        .time-input {
+            width: 100%;
+            background: #0a0a0a;
+            border: 1px solid #27272a;
+            border-radius: 8px;
+            padding: 12px 14px;
+            font-size: 14px;
+            color: #fafafa;
+            transition: all 0.2s;
+            font-family: inherit;
+        }
+
+        .time-input:focus {
+            outline: none;
+            border-color: #52525b;
+            background: #000;
+        }
+
         .btn {
             width: 100%;
             background: #fafafa;
@@ -260,6 +296,40 @@
             color: #52525b;
         }
 
+        .task-time-info {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            font-size: 11px;
+            color: #71717a;
+            margin-top: 8px;
+            margin-bottom: 8px;
+        }
+
+        .task-time-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .task-time-label {
+            color: #52525b;
+            font-weight: 500;
+        }
+
+        .task-time-value {
+            color: #a1a1aa;
+        }
+
+        .task-tempo-gasto {
+            color: #fafafa;
+            font-weight: 600;
+            background: #27272a;
+            padding: 4px 8px;
+            border-radius: 4px;
+            display: inline-block;
+        }
+
         .btn-delete {
             background: transparent;
             border: 1px solid #27272a;
@@ -331,6 +401,16 @@
         <div class="input-group">
             <textarea id="descricao" placeholder="Adicione uma descrição (opcional)"></textarea>
         </div>
+        <div class="input-group time-inputs">
+            <div class="time-input-wrapper">
+                <label for="horaInicio" class="time-label">Hora de Início</label>
+                <input type="time" id="horaInicio" class="time-input">
+            </div>
+            <div class="time-input-wrapper">
+                <label for="horaTermino" class="time-label">Hora de Término</label>
+                <input type="time" id="horaTermino" class="time-input">
+            </div>
+        </div>
         <button class="btn" onclick="adicionarTarefa()">Adicionar</button>
     </div>
 
@@ -388,6 +468,31 @@
         return div.innerHTML;
     }
 
+    // Função para formatar hora (HH:mm)
+    function formatarHora(hora) {
+        if (!hora) return null;
+        // Se for string no formato HH:mm, retorna como está
+        if (typeof hora === 'string') {
+            return hora;
+        }
+        // Se for objeto com horas e minutos
+        if (hora.hours !== undefined && hora.minutes !== undefined) {
+            return String(hora.hours).padStart(2, '0') + ':' + String(hora.minutes).padStart(2, '0');
+        }
+        return hora;
+    }
+
+    // Função para formatar tempo gasto
+    function formatarTempoGasto(minutos) {
+        if (!minutos || minutos === 0) return '0 min';
+        const horas = Math.floor(minutos / 60);
+        const mins = minutos % 60;
+        if (horas > 0) {
+            return `${horas}h ${mins}min`;
+        }
+        return `${mins} min`;
+    }
+
     window.onload = function() {
         carregarTarefas();
     };
@@ -395,14 +500,18 @@
     async function adicionarTarefa() {
         const tituloInput = document.getElementById('titulo');
         const descricaoInput = document.getElementById('descricao');
+        const horaInicioInput = document.getElementById('horaInicio');
+        const horaTerminoInput = document.getElementById('horaTermino');
         
-        if (!tituloInput || !descricaoInput) {
+        if (!tituloInput || !descricaoInput || !horaInicioInput || !horaTerminoInput) {
             console.error('Elementos do formulário não encontrados');
             return;
         }
 
         const titulo = tituloInput.value.trim();
         const descricao = descricaoInput.value.trim();
+        const horaInicio = horaInicioInput.value || null;
+        const horaTermino = horaTerminoInput.value || null;
 
         if (!titulo) {
             alert('Por favor, insira um título para a tarefa.');
@@ -410,10 +519,24 @@
             return;
         }
 
+        // Validação: se uma hora for preenchida, a outra também deve ser
+        if ((horaInicio && !horaTermino) || (!horaInicio && horaTermino)) {
+            alert('Por favor, preencha ambas as horas (início e término) ou deixe ambas vazias.');
+            return;
+        }
+
+        // Validação: hora de término deve ser depois da hora de início
+        if (horaInicio && horaTermino && horaTermino <= horaInicio) {
+            alert('A hora de término deve ser posterior à hora de início.');
+            return;
+        }
+
         const tarefa = {
             titulo: titulo,
             descricao: descricao || null,
-            concluida: false
+            concluida: false,
+            horaInicio: horaInicio,
+            horaTermino: horaTermino
         };
 
         try {
@@ -428,6 +551,8 @@
             if (response.ok) {
                 tituloInput.value = '';
                 descricaoInput.value = '';
+                horaInicioInput.value = '';
+                horaTerminoInput.value = '';
                 carregarTarefas();
             } else {
                 // Tenta obter mensagem de erro do servidor
@@ -504,13 +629,27 @@
             return;
         }
 
-        taskList.innerHTML = tarefasFiltradas.map(tarefa => `
+        taskList.innerHTML = tarefasFiltradas.map(tarefa => {
+            const horaInicio = tarefa.horaInicio ? formatarHora(tarefa.horaInicio) : null;
+            const horaTermino = tarefa.horaTermino ? formatarHora(tarefa.horaTermino) : null;
+            const tempoGasto = tarefa.tempoGastoMinutos !== null && tarefa.tempoGastoMinutos !== undefined 
+                ? formatarTempoGasto(tarefa.tempoGastoMinutos) 
+                : null;
+
+            return `
             <li class="task-item ${tarefa.concluida ? 'completed' : ''}">
                 <div class="task-header">
                     <div class="checkbox" onclick="alternarConclusao(${tarefa.id})"></div>
                     <div class="task-content">
                         <div class="task-title">${escapeHtml(tarefa.titulo || '')}</div>
                         ${tarefa.descricao ? '<div class="task-description">' + escapeHtml(tarefa.descricao) + '</div>' : ''}
+                        ${(horaInicio || horaTermino || tempoGasto) ? `
+                        <div class="task-time-info">
+                            ${horaInicio ? `<div class="task-time-item"><span class="task-time-label">Início:</span><span class="task-time-value">${horaInicio}</span></div>` : ''}
+                            ${horaTermino ? `<div class="task-time-item"><span class="task-time-label">Término:</span><span class="task-time-value">${horaTermino}</span></div>` : ''}
+                            ${tempoGasto ? `<div class="task-time-item"><span class="task-time-label">Tempo:</span><span class="task-tempo-gasto">${tempoGasto}</span></div>` : ''}
+                        </div>
+                        ` : ''}
                         <div class="task-footer">
                             <div class="task-date">${tarefa.dataCriacao ? new Date(tarefa.dataCriacao).toLocaleDateString('pt-BR') : 'Data não disponível'}</div>
                             <button class="btn-delete" onclick="deletarTarefa(${tarefa.id}, event)">Deletar</button>
@@ -518,7 +657,8 @@
                     </div>
                 </div>
             </li>
-        `).join('');
+        `;
+        }).join('');
     }
 
     function atualizarEstatisticas(tarefas) {

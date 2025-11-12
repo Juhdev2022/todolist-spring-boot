@@ -30,6 +30,13 @@ public class TarefaController {
             if (tarefa.getConcluida() == null) {
                 tarefa.setConcluida(false);
             }
+            // Processa as horas se fornecidas como string
+            if (tarefa.getHoraInicio() == null && tarefa.getHoraTermino() == null) {
+                // Se ambas forem null, mantém null
+            } else {
+                // Se uma hora for fornecida como string, converte para LocalTime
+                // Isso será tratado automaticamente pelo Jackson se o formato estiver correto
+            }
             Tarefa novaTarefa = repository.save(tarefa);
             return ResponseEntity.status(HttpStatus.CREATED).body(novaTarefa);
         } catch (Exception e) {
@@ -80,6 +87,13 @@ public class TarefaController {
                 tarefa.setDescricao(tarefaAtualizada.getDescricao());
                 if (tarefaAtualizada.getConcluida() != null) {
                     tarefa.setConcluida(tarefaAtualizada.getConcluida());
+                }
+                // Atualiza as horas se fornecidas
+                if (tarefaAtualizada.getHoraInicio() != null) {
+                    tarefa.setHoraInicio(tarefaAtualizada.getHoraInicio());
+                }
+                if (tarefaAtualizada.getHoraTermino() != null) {
+                    tarefa.setHoraTermino(tarefaAtualizada.getHoraTermino());
                 }
 
                 Tarefa tarefaSalva = repository.save(tarefa);

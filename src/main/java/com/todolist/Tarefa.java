@@ -4,6 +4,8 @@ import jakarta.persistence.*;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.time.Duration;
 
 @Entity
 @Table(name = "tarefas")
@@ -27,6 +29,15 @@ public class Tarefa {
 
     @Column(name = "data_criacao")
     private LocalDateTime dataCriacao;
+
+    @Column(name = "hora_inicio")
+    private LocalTime horaInicio;
+
+    @Column(name = "hora_termino")
+    private LocalTime horaTermino;
+
+    @Column(name = "tempo_gasto_minutos")
+    private Long tempoGastoMinutos;
 
     // Construtor vazio (obrigatório para JPA)
     public Tarefa() {
@@ -80,5 +91,60 @@ public class Tarefa {
 
     public void setDataCriacao(LocalDateTime dataCriacao) {
         this.dataCriacao = dataCriacao;
+    }
+
+    public LocalTime getHoraInicio() {
+        return horaInicio;
+    }
+
+    public void setHoraInicio(LocalTime horaInicio) {
+        this.horaInicio = horaInicio;
+        calcularTempoGasto();
+    }
+
+    public LocalTime getHoraTermino() {
+        return horaTermino;
+    }
+
+    public void setHoraTermino(LocalTime horaTermino) {
+        this.horaTermino = horaTermino;
+        calcularTempoGasto();
+    }
+
+    public Long getTempoGastoMinutos() {
+        return tempoGastoMinutos;
+    }
+
+    public void setTempoGastoMinutos(Long tempoGastoMinutos) {
+        this.tempoGastoMinutos = tempoGastoMinutos;
+    }
+
+    // Método para calcular o tempo gasto automaticamente
+    private void calcularTempoGasto() {
+        if (horaInicio != null && horaTermino != null) {
+            if (horaTermino.isAfter(horaInicio) || horaTermino.equals(horaInicio)) {
+                Duration duracao = Duration.between(horaInicio, horaTermino);
+                this.tempoGastoMinutos = duracao.toMinutes();
+            } else {
+                // Se a hora de término for anterior à de início, assume que passou meia-noite
+                Duration duracao = Duration.between(horaInicio, horaTermino).plusDays(1);
+                this.tempoGastoMinutos = duracao.toMinutes();
+            }
+        } else {
+            this.tempoGastoMinutos = null;
+        }
+    }
+
+    // Método auxiliar para formatar o tempo gasto
+    public String getTempoGastoFormatado() {
+        if (tempoGastoMinutos == null || tempoGastoMinutos == 0) {
+            return "0 min";
+        }
+        long horas = tempoGastoMinutos / 60;
+        long minutos = tempoGastoMinutos % 60;
+        if (horas > 0) {
+            return String.format("%dh %dm", horas, minutos);
+        }
+        return String.format("%d min", minutos);
     }
 }
