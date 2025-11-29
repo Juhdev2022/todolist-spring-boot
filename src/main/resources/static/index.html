@@ -146,7 +146,7 @@
 
         .stats {
             display: grid;
-            grid-template-columns: repeat(4, 1fr);
+            grid-template-columns: repeat(5, 1fr);
             gap: 12px;
             margin-bottom: 32px;
         }
@@ -392,6 +392,9 @@
     <header>
         <h1>Task Manager</h1>
         <p class="subtitle">Organize suas tarefas de forma simples e elegante</p>
+        <div id="session-actions" style="margin-top:12px; display:none">
+            <button class="btn" onclick="logout()">Logout</button>
+        </div>
     </header>
 
     <div class="form-container" id="auth-container">
@@ -452,6 +455,10 @@
         <div class="stat-card">
             <div class="stat-number" id="tempo-total">0 min</div>
             <div class="stat-label">Tempo Total</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-number" id="tempo-selecionado">0 min</div>
+            <div class="stat-label">Selecionadas</div>
         </div>
     </div>
 
@@ -521,6 +528,8 @@
     let selectedDate = new Date().toISOString().slice(0,10);
     let currentMonth = new Date().getMonth();
     let currentYear = new Date().getFullYear();
+    let selectedIds = new Set();
+    let tarefasDia = [];
 
     window.onload = function() {
         verificarSessao();
@@ -537,12 +546,36 @@
                 document.getElementById('filters').style.display = 'flex';
                 document.getElementById('stats').style.display = 'grid';
                 document.getElementById('task-list').style.display = 'flex';
+                const sa = document.getElementById('session-actions');
+                if (sa) sa.style.display = 'block';
                 carregarTarefas();
                 carregarTempoTotal();
             } else {
                 document.getElementById('auth-container').style.display = 'block';
+                const sa = document.getElementById('session-actions');
+                if (sa) sa.style.display = 'none';
             }
         } catch {}
+    }
+
+    async function logout() {
+        try {
+            await fetch(`${AUTH_API}/logout`, { method:'POST' });
+        } catch {}
+        selectedIds = new Set();
+        tarefasDia = [];
+        document.getElementById('auth-container').style.display = 'block';
+        document.getElementById('calendar-container').style.display = 'none';
+        document.getElementById('task-form').style.display = 'none';
+        document.getElementById('filters').style.display = 'none';
+        document.getElementById('stats').style.display = 'none';
+        document.getElementById('task-list').style.display = 'none';
+        const sa = document.getElementById('session-actions');
+        if (sa) sa.style.display = 'none';
+        const tt = document.getElementById('tempo-total');
+        if (tt) tt.textContent = '0 min';
+        const ts = document.getElementById('tempo-selecionado');
+        if (ts) ts.textContent = '0 min';
     }
 
     async function registrar() {
@@ -656,6 +689,7 @@
             }
             
             const tarefas = await response.json();
+            tarefasDia = tarefas;
             
             // Garante que tarefas é um array
             if (!Array.isArray(tarefas)) {
@@ -667,6 +701,7 @@
             
             renderizarTarefas(tarefas);
             atualizarEstatisticas(tarefas);
+            carregarTempoTotal();
         } catch (error) {
             console.error('Erro ao carregar tarefas:', error);
             const taskList = document.getElementById('task-list');
@@ -675,6 +710,8 @@
             }
             // Atualiza estatísticas com valores zerados em caso de erro
             atualizarEstatisticas([]);
+            const el = document.getElementById('tempo-total');
+            if (el) el.textContent = '0 min';
         }
     }
 
@@ -700,9 +737,11 @@
             const tempoGasto = tarefa.tempoGastoMinutos !== null && tarefa.tempoGastoMinutos !== undefined 
                 ? formatarTempoGasto(tarefa.tempoGastoMinutos) 
                 : null;
+            const selectedClass = selectedIds.has(tarefa.id) ? 'selected' : '';
+            const selectLabel = selectedIds.has(tarefa.id) ? 'Selecionada' : 'Selecionar';
 
             return `
-            <li class="task-item ${tarefa.concluida ? 'completed' : ''}">
+            <li class="task-item ${tarefa.concluida ? 'completed' : ''} ${selectedClass}">
                 <div class="task-header">
                     <div class="checkbox" onclick="alternarConclusao(${tarefa.id})"></div>
                     <div class="task-content">
@@ -717,6 +756,7 @@
                         ` : ''}
                         <div class="task-footer">
                             <div class="task-date">${tarefa.dataCriacao ? new Date(tarefa.dataCriacao).toLocaleDateString('pt-BR') : 'Data não disponível'}</div>
+                            <button class="filter-btn" onclick="alternarSelecao(${tarefa.id})">${selectLabel}</button>
                             <button class="btn-delete" onclick="deletarTarefa(${tarefa.id}, event)">Deletar</button>
                         </div>
                     </div>
@@ -752,6 +792,7 @@
             
             if (response.ok) {
                 carregarTarefas();
+                carregarTempoTotal();
             } else {
                 const contentType = response.headers.get('content-type');
                 let errorMessage = `Erro HTTP ${response.status}`;
@@ -791,6 +832,7 @@
             
             if (response.ok) {
                 carregarTarefas();
+                carregarTempoTotal();
             } else {
                 const contentType = response.headers.get('content-type');
                 let errorMessage = 'Erro ao deletar tarefa.';
@@ -843,6 +885,7 @@
 
     function selecionarDia(iso) {
         selectedDate = iso;
+        selectedIds = new Set();
         renderizarCalendario();
         carregarTarefas();
         carregarTempoTotal();
@@ -867,8 +910,40 @@
                 const totalMin = await r.json();
                 const el = document.getElementById('tempo-total');
                 if (el) el.textContent = formatarTempoGasto(totalMin);
+            } else {
+                const el = document.getElementById('tempo-total');
+                if (el) el.textContent = '0 min';
             }
-        } catch {}
+        } catch {
+            const el = document.getElementById('tempo-total');
+            if (el) el.textContent = '0 min';
+        }
+        atualizarTempoSelecionado();
+    }
+
+    function alternarSelecao(id) {
+        if (!id) return;
+        if (selectedIds.has(id)) {
+            selectedIds.delete(id);
+        } else {
+            selectedIds.add(id);
+        }
+        atualizarTempoSelecionado();
+        renderizarTarefas(tarefasDia);
+    }
+
+    function atualizarTempoSelecionado() {
+        try {
+            const total = (tarefasDia || [])
+                .filter(t => selectedIds.has(t.id))
+                .map(t => t.tempoGastoMinutos || 0)
+                .reduce((a, b) => a + b, 0);
+            const el = document.getElementById('tempo-selecionado');
+            if (el) el.textContent = formatarTempoGasto(total);
+        } catch {
+            const el = document.getElementById('tempo-selecionado');
+            if (el) el.textContent = '0 min';
+        }
     }
 
     document.getElementById('titulo').addEventListener('keypress', function(e) {
