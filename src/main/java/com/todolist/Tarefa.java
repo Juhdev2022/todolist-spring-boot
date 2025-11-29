@@ -3,6 +3,7 @@ package com.todolist;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
+import com.fasterxml.jackson.annotation.JsonFormat;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.Duration;
@@ -31,9 +32,11 @@ public class Tarefa {
     private LocalDateTime dataCriacao;
 
     @Column(name = "hora_inicio")
+    @JsonFormat(pattern = "HH:mm")
     private LocalTime horaInicio;
 
     @Column(name = "hora_termino")
+    @JsonFormat(pattern = "HH:mm")
     private LocalTime horaTermino;
 
     @Column(name = "tempo_gasto_minutos")
