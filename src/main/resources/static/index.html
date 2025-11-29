@@ -146,7 +146,7 @@
 
         .stats {
             display: grid;
-            grid-template-columns: repeat(3, 1fr);
+            grid-template-columns: repeat(4, 1fr);
             gap: 12px;
             margin-bottom: 32px;
         }
@@ -394,7 +394,29 @@
         <p class="subtitle">Organize suas tarefas de forma simples e elegante</p>
     </header>
 
-    <div class="form-container">
+    <div class="form-container" id="auth-container">
+        <div class="input-group">
+            <input type="text" id="auth-username" placeholder="Usuário">
+        </div>
+        <div class="input-group">
+            <input type="password" id="auth-password" placeholder="Senha">
+        </div>
+        <div style="display:flex; gap:8px">
+            <button class="btn" onclick="registrar()">Registrar</button>
+            <button class="btn" onclick="login()">Login</button>
+        </div>
+    </div>
+
+    <div class="form-container" id="calendar-container" style="display:none">
+        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px">
+            <button class="filter-btn" onclick="prevMonth()">◀</button>
+            <div id="calendar-title"></div>
+            <button class="filter-btn" onclick="nextMonth()">▶</button>
+        </div>
+        <div id="calendar-grid" style="display:grid; grid-template-columns: repeat(7, 1fr); gap:8px"></div>
+    </div>
+
+    <div class="form-container" id="task-form" style="display:none">
         <div class="input-group">
             <input type="text" id="titulo" placeholder="Nova tarefa">
         </div>
@@ -414,7 +436,7 @@
         <button class="btn" onclick="adicionarTarefa()">Adicionar</button>
     </div>
 
-    <div class="stats">
+    <div class="stats" id="stats" style="display:none">
         <div class="stat-card">
             <div class="stat-number" id="total-tarefas">0</div>
             <div class="stat-label">Total</div>
@@ -427,15 +449,19 @@
             <div class="stat-number" id="concluidas">0</div>
             <div class="stat-label">Concluídas</div>
         </div>
+        <div class="stat-card">
+            <div class="stat-number" id="tempo-total">0 min</div>
+            <div class="stat-label">Tempo Total</div>
+        </div>
     </div>
 
-    <div class="filters">
+    <div class="filters" id="filters" style="display:none">
         <button class="filter-btn active" onclick="filtrarTarefas('todas', this)">Todas</button>
         <button class="filter-btn" onclick="filtrarTarefas('pendentes', this)">Pendentes</button>
         <button class="filter-btn" onclick="filtrarTarefas('concluidas', this)">Concluídas</button>
     </div>
 
-    <ul class="task-list" id="task-list">
+    <ul class="task-list" id="task-list" style="display:none">
         <li class="empty-state">
             <div class="empty-icon">📝</div>
             <p class="empty-text">Nenhuma tarefa criada ainda</p>
@@ -445,19 +471,18 @@
 
 <script>
     // Detecção automática da URL da API
-    const API_URL = (() => {
+    const TASKS_API = (() => {
         const hostname = window.location.hostname;
         const protocol = window.location.protocol;
         const port = window.location.port;
         
-        // Se for localhost ou 127.0.0.1, usa porta 8080
         if (hostname === 'localhost' || hostname === '127.0.0.1') {
-            return `${protocol}//${hostname}:${port || '8080'}/api/tarefas`;
+            return `${protocol}//${hostname}:${port || '8080'}/api/my/tarefas`;
         }
         
-        // Em produção, usa a mesma origem
-        return `${window.location.origin}/api/tarefas`;
+        return `${window.location.origin}/api/my/tarefas`;
     })();
+    const AUTH_API = `${window.location.origin}/api/auth`;
 
     let filtroAtual = 'todas';
 
@@ -493,9 +518,48 @@
         return `${mins} min`;
     }
 
+    let selectedDate = new Date().toISOString().slice(0,10);
+    let currentMonth = new Date().getMonth();
+    let currentYear = new Date().getFullYear();
+
     window.onload = function() {
-        carregarTarefas();
+        verificarSessao();
+        renderizarCalendario();
     };
+
+    async function verificarSessao() {
+        try {
+            const res = await fetch(`${AUTH_API}/me`);
+            if (res.ok) {
+                document.getElementById('auth-container').style.display = 'none';
+                document.getElementById('calendar-container').style.display = 'block';
+                document.getElementById('task-form').style.display = 'block';
+                document.getElementById('filters').style.display = 'flex';
+                document.getElementById('stats').style.display = 'grid';
+                document.getElementById('task-list').style.display = 'flex';
+                carregarTarefas();
+                carregarTempoTotal();
+            } else {
+                document.getElementById('auth-container').style.display = 'block';
+            }
+        } catch {}
+    }
+
+    async function registrar() {
+        const username = document.getElementById('auth-username').value.trim();
+        const password = document.getElementById('auth-password').value.trim();
+        if (!username || !password) { alert('Informe usuário e senha'); return; }
+        const r = await fetch(`${AUTH_API}/register`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({username, password}) });
+        if (r.ok) { alert('Registrado. Faça login.'); } else { alert('Erro ao registrar'); }
+    }
+
+    async function login() {
+        const username = document.getElementById('auth-username').value.trim();
+        const password = document.getElementById('auth-password').value.trim();
+        if (!username || !password) { alert('Informe usuário e senha'); return; }
+        const r = await fetch(`${AUTH_API}/login`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({username, password}) });
+        if (r.ok) { verificarSessao(); } else { alert('Login inválido'); }
+    }
 
     async function adicionarTarefa() {
         const tituloInput = document.getElementById('titulo');
@@ -536,11 +600,12 @@
             descricao: descricao || null,
             concluida: false,
             horaInicio: horaInicio,
-            horaTermino: horaTermino
+            horaTermino: horaTermino,
+            dataTarefa: selectedDate
         };
 
         try {
-            const response = await fetch(API_URL, {
+            const response = await fetch(TASKS_API, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
@@ -579,7 +644,7 @@
 
     async function carregarTarefas() {
         try {
-            const response = await fetch(API_URL);
+            const response = await fetch(TASKS_API + (selectedDate ? `?data=${selectedDate}` : ''));
             if (!response.ok) {
                 throw new Error(`Erro HTTP: ${response.status}`);
             }
@@ -678,7 +743,7 @@
         }
 
         try {
-            const response = await fetch(`${API_URL}/${id}/concluir`, {
+            const response = await fetch(`${TASKS_API}/${id}/concluir`, {
                 method: 'PATCH',
                 headers: {
                     'Content-Type': 'application/json'
@@ -720,7 +785,7 @@
         }
 
         try {
-            const response = await fetch(`${API_URL}/${id}`, {
+            const response = await fetch(`${TASKS_API}/${id}`, {
                 method: 'DELETE'
             });
             
@@ -757,6 +822,53 @@
             eventElement.classList.add('active');
         }
         carregarTarefas();
+    }
+
+    function renderizarCalendario() {
+        const title = document.getElementById('calendar-title');
+        const grid = document.getElementById('calendar-grid');
+        const date = new Date(currentYear, currentMonth, 1);
+        const monthName = date.toLocaleString('pt-BR', { month: 'long' });
+        title.textContent = `${monthName} ${currentYear}`;
+        grid.innerHTML = '';
+        const startDay = (date.getDay() + 6) % 7;
+        for (let i = 0; i < startDay; i++) { grid.innerHTML += `<div></div>`; }
+        const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+        for (let d = 1; d <= daysInMonth; d++) {
+            const iso = new Date(currentYear, currentMonth, d).toISOString().slice(0,10);
+            const isSelected = iso === selectedDate;
+            grid.innerHTML += `<button class="filter-btn${isSelected ? ' active' : ''}" onclick="selecionarDia('${iso}')">${d}</button>`;
+        }
+    }
+
+    function selecionarDia(iso) {
+        selectedDate = iso;
+        renderizarCalendario();
+        carregarTarefas();
+        carregarTempoTotal();
+    }
+
+    function prevMonth() {
+        currentMonth -= 1;
+        if (currentMonth < 0) { currentMonth = 11; currentYear -= 1; }
+        renderizarCalendario();
+    }
+
+    function nextMonth() {
+        currentMonth += 1;
+        if (currentMonth > 11) { currentMonth = 0; currentYear += 1; }
+        renderizarCalendario();
+    }
+
+    async function carregarTempoTotal() {
+        try {
+            const r = await fetch(`${TASKS_API}/soma-tempo?data=${selectedDate}`);
+            if (r.ok) {
+                const totalMin = await r.json();
+                const el = document.getElementById('tempo-total');
+                if (el) el.textContent = formatarTempoGasto(totalMin);
+            }
+        } catch {}
     }
 
     document.getElementById('titulo').addEventListener('keypress', function(e) {

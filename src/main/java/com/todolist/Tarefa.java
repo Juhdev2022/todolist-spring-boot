@@ -7,6 +7,7 @@ import com.fasterxml.jackson.annotation.JsonFormat;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.Duration;
+import java.time.LocalDate;
 
 @Entity
 @Table(name = "tarefas")
@@ -41,6 +42,14 @@ public class Tarefa {
 
     @Column(name = "tempo_gasto_minutos")
     private Long tempoGastoMinutos;
+
+    @ManyToOne
+    @JoinColumn(name = "usuario_id")
+    private Usuario usuario;
+
+    @Column(name = "data_tarefa")
+    @JsonFormat(pattern = "yyyy-MM-dd")
+    private LocalDate dataTarefa;
 
     // Construtor vazio (obrigatório para JPA)
     public Tarefa() {
@@ -120,6 +129,22 @@ public class Tarefa {
 
     public void setTempoGastoMinutos(Long tempoGastoMinutos) {
         this.tempoGastoMinutos = tempoGastoMinutos;
+    }
+
+    public Usuario getUsuario() {
+        return usuario;
+    }
+
+    public void setUsuario(Usuario usuario) {
+        this.usuario = usuario;
+    }
+
+    public LocalDate getDataTarefa() {
+        return dataTarefa;
+    }
+
+    public void setDataTarefa(LocalDate dataTarefa) {
+        this.dataTarefa = dataTarefa;
     }
 
     // Método para calcular o tempo gasto automaticamente

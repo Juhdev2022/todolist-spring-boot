@@ -3,6 +3,7 @@ package com.todolist;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 import java.util.List;
+import java.time.LocalDate;
 
 @Repository
 public interface TarefaRepository extends JpaRepository<Tarefa, Long> {
@@ -16,7 +17,6 @@ public interface TarefaRepository extends JpaRepository<Tarefa, Long> {
 
     // Você pode adicionar métodos personalizados:
     List<Tarefa> findByConcluida(Boolean concluida);
-
-    // Spring entende automaticamente e cria a query SQL!
-    // SELECT * FROM tarefas WHERE concluida = ?
+    List<Tarefa> findByUsuarioId(Long usuarioId);
+    List<Tarefa> findByUsuarioIdAndDataTarefa(Long usuarioId, LocalDate dataTarefa);
 }
